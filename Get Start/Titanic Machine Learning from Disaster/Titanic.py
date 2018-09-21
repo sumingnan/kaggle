@@ -5,6 +5,9 @@ import numpy as np
 from pandas import Series,DataFrame
 import os
 import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+import sklearn.preprocessing as preprocessing
+from sklearn import linear_model
 
 absPath = os.path.abspath(os.path.dirname('train.csv'))
 data_train = pd.read_csv(absPath + "/data/train.csv")
@@ -89,6 +92,7 @@ plt.legend([u"男性/低级舱"], loc='best')
 
 plt.show()
 '''
+'''
 Survived_0 = data_train.Embarked[data_train.Survived == 0].value_counts()
 Survived_1 = data_train.Embarked[data_train.Survived == 1].value_counts()
 df=pd.DataFrame({u'获救':Survived_1, u'未获救':Survived_0})
@@ -98,3 +102,54 @@ plt.xlabel(u"登录港口")
 plt.ylabel(u"人数")
 
 plt.show()
+'''
+def set_missing_ages(df):
+    age_df = df[['Age', 'Fare', 'Parch', 'SibSp', 'Pclass']]
+
+    know_age = age_df[age_df.Age.notnull()].values
+    unknow_age = age_df[age_df.Age.isnull()].values
+
+    #用其他特征值预测年龄
+    y = know_age[:,0]
+    x = know_age[:,1:]
+
+    rfr = RandomForestRegressor(random_state=0, n_estimators=2000, n_jobs=-1)
+    rfr.fit(x, y)
+
+    predictedAge = rfr.predict(unknow_age[:,1::])
+    df.loc[(df.Age.isnull()), 'Age'] = predictedAge
+
+    return df, rfr
+
+def set_Cabin_type(df):
+    df.loc[(df.Cabin.notnull()), 'Cabin'] = "Yes"
+    df.loc[(df.Cabin.isnull()), 'Cabin'] = "No"
+    return df
+
+data_train, rfr = set_missing_ages(data_train)
+data_train = set_Cabin_type(data_train)
+
+dummies_Cabin = pd.get_dummies(data_train['Cabin'], prefix='Cabin')
+dummies_Embarked = pd.get_dummies(data_train['Embarked'], prefix='Embarked')
+dummies_Sex = pd.get_dummies(data_train['Sex'], prefix='Sex')
+dummies_Pclass = pd.get_dummies(data_train['Pclass'], prefix='Pclass')
+
+df = pd.concat([data_train, dummies_Cabin, dummies_Embarked, dummies_Sex, dummies_Pclass], axis=1)
+df.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
+
+scaler = preprocessing.StandardScaler()
+age_scale_param = scaler.fit(df['Age'])
+df['Age_scaled'] = scaler.fit_transform(df['Age'], age_scale_param)
+fare_scale_param = scaler.fit(df['Fare'])
+df['Fare_scaled'] = scaler.fit_transform(df['Fare'], fare_scale_param)
+
+train_df = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+train_np = train_df.as_matrix()
+
+y = train_np[:,0]
+x = train_np[:,1:]
+
+clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
+clf.fit(x, y)
+
+
