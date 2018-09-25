@@ -138,18 +138,18 @@ df = pd.concat([data_train, dummies_Cabin, dummies_Embarked, dummies_Sex, dummie
 df.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
 
 scaler = preprocessing.StandardScaler()
-age_scale_param = scaler.fit(df['Age'])
-df['Age_scaled'] = scaler.fit_transform(df['Age'], age_scale_param)
-fare_scale_param = scaler.fit(df['Fare'])
-df['Fare_scaled'] = scaler.fit_transform(df['Fare'], fare_scale_param)
+age_scale_param = scaler.fit(np.array(df['Age']).reshape(-1, 1))
+df['Age_scaled'] = scaler.fit_transform(np.array(df['Age']).reshape(-1, 1), age_scale_param)
+fare_scale_param = scaler.fit(np.array(df['Fare']).reshape(-1, 1))
+df['Fare_scaled'] = scaler.fit_transform(np.array(df['Fare']).reshape(-1, 1), fare_scale_param)
 
 train_df = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
-train_np = train_df.as_matrix()
+train_np = train_df.values
 
 y = train_np[:,0]
 x = train_np[:,1:]
 
 clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
 clf.fit(x, y)
-
+print clf
 
