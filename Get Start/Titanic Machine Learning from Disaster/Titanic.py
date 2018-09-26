@@ -122,13 +122,33 @@ def set_missing_ages(df):
 
     return df, rfr
 
+def CabinNoCheck(no):
+    v = no.split(' ')
+    for i in range(len(v)):
+        if len(v[i]) > 1:
+            return float(v[i][1:])
+    return 0
+
 def set_Cabin_type(df):
+    df.loc[(df.Cabin.notnull()), 'Cabin_No'] = df.loc[df.Cabin.notnull(), "Cabin"]
     df.loc[(df.Cabin.notnull()), 'Cabin'] = "Yes"
     df.loc[(df.Cabin.isnull()), 'Cabin'] = "No"
     return df
 
+def checkCabinNo(df):
+    for i in range(0, len(df)):
+        if df.iloc[i]['Cabin_No'] != 0:
+            v = df.iloc[i]['Cabin_No']
+            df.iloc[i, df.columns.get_loc('Cabin_No')] = float(CabinNoCheck(v))
+    return df
+
 data_train, rfr = set_missing_ages(data_train)
+data_train['Cabin_No'] = float(0)
 data_train = set_Cabin_type(data_train)
+data_train = checkCabinNo(data_train)
+data_train['Cabin_No'] = data_train['Cabin_No'].astype(float)
+#print data_train['Age']
+print data_train['Cabin_No']
 
 dummies_Cabin = pd.get_dummies(data_train['Cabin'], prefix='Cabin')
 #dummies_Embarked = pd.get_dummies(data_train['Embarked'], prefix='Embarked')
@@ -141,19 +161,21 @@ df['Child'] = 0
 df.loc[(df.Age < 12), 'Child'] = 1
 #mother
 df['Mother'] = 0
-df.loc[((df.Parch > 1) & ('Mrs' in  df.Name)), 'Mother'] = 1
+df.loc[((df.Parch > 1) & ('Mrs' in df.Name)), 'Mother'] = 1
 #fam size
 df['Family_size'] = df['Parch'] + df['SibSp'] + 1
-
 df.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
 
 scaler = preprocessing.StandardScaler()
 age_scale_param = scaler.fit(np.array(df['Age']).reshape(-1, 1))
+print type(df['Age'])
 df['Age_scaled'] = scaler.fit_transform(np.array(df['Age']).reshape(-1, 1), age_scale_param)
 fare_scale_param = scaler.fit(np.array(df['Fare']).reshape(-1, 1))
 df['Fare_scaled'] = scaler.fit_transform(np.array(df['Fare']).reshape(-1, 1), fare_scale_param)
-print type(df)
-
+cabinNo_scale_param = scaler.fit(np.array(df['Cabin_No']).reshape(-1, 1))
+df['Cabin_No_scaled'] = scaler.fit_transform(np.array(df['Cabin_No']).reshape(-1, 1), cabinNo_scale_param)
+print (df)
+df.drop(['Cabin_No'], axis=1, inplace=True)
 train_df = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 train_np = train_df.values
 #训练
@@ -169,7 +191,7 @@ X = all_data.values[:,1:]
 Y = all_data.values[:,0]
 print cross_validation.cross_val_score(clf, X, Y, cv=5)
 '''
-'''
+
 split_train, split_cv = cross_validation.train_test_split(df, test_size=0.3, random_state=0)
 train_df = split_train.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 clf1 = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
@@ -180,11 +202,12 @@ predictions = clf1.predict(cv_df.values[:,1:])
 
 origin_data_train = pd.read_csv(absPath + '/data/Train.csv')
 bad_cases = origin_data_train.loc[origin_data_train['PassengerId'].isin(split_cv[predictions != cv_df.values[:,0]]['PassengerId'])]
+bad_cases.to_csv(absPath + '/data/badcase.csv', index=False)
 print bad_cases
-'''
+
 #测试数据的处理
 
-
+'''
 data_test = pd.read_csv(absPath + '/data/test.csv')
 data_test.loc[(data_test.Fare.isnull()), 'Fare'] = 0
 
@@ -219,3 +242,4 @@ test = df_test.filter(regex='Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.
 predictions = clf.predict(test)
 result = pd.DataFrame({'PassengerId':data_test['PassengerId'].values, 'Survived':predictions.astype(np.int32)})
 result.to_csv(absPath + '/data/logistic_regression_prediction.csv', index=False)
+'''
