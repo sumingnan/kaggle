@@ -131,11 +131,20 @@ data_train, rfr = set_missing_ages(data_train)
 data_train = set_Cabin_type(data_train)
 
 dummies_Cabin = pd.get_dummies(data_train['Cabin'], prefix='Cabin')
-dummies_Embarked = pd.get_dummies(data_train['Embarked'], prefix='Embarked')
+#dummies_Embarked = pd.get_dummies(data_train['Embarked'], prefix='Embarked')
 dummies_Sex = pd.get_dummies(data_train['Sex'], prefix='Sex')
 dummies_Pclass = pd.get_dummies(data_train['Pclass'], prefix='Pclass')
 
-df = pd.concat([data_train, dummies_Cabin, dummies_Embarked, dummies_Sex, dummies_Pclass], axis=1)
+df = pd.concat([data_train, dummies_Cabin, dummies_Sex, dummies_Pclass], axis=1)
+#child
+df['Child'] = 0
+df.loc[(df.Age < 12), 'Child'] = 1
+#mother
+df['Mother'] = 0
+df.loc[((df.Parch > 1) & ('Mrs' in  df.Name)), 'Mother'] = 1
+#fam size
+df['Family_size'] = df['Parch'] + df['SibSp'] + 1
+
 df.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
 
 scaler = preprocessing.StandardScaler()
@@ -145,7 +154,7 @@ fare_scale_param = scaler.fit(np.array(df['Fare']).reshape(-1, 1))
 df['Fare_scaled'] = scaler.fit_transform(np.array(df['Fare']).reshape(-1, 1), fare_scale_param)
 print type(df)
 
-train_df = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+train_df = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 train_np = train_df.values
 #训练
 y = train_np[:,0]
@@ -155,24 +164,26 @@ clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
 clf.fit(x, y)
 print clf
 '''
-all_data = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+all_data = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 X = all_data.values[:,1:]
 Y = all_data.values[:,0]
 print cross_validation.cross_val_score(clf, X, Y, cv=5)
 '''
+'''
 split_train, split_cv = cross_validation.train_test_split(df, test_size=0.3, random_state=0)
-train_df = split_train.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+train_df = split_train.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 clf1 = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
 clf1.fit(train_df.values[:,1:], train_df.values[:,0])
 
-cv_df = split_cv.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+cv_df = split_cv.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 predictions = clf1.predict(cv_df.values[:,1:])
 
 origin_data_train = pd.read_csv(absPath + '/data/Train.csv')
 bad_cases = origin_data_train.loc[origin_data_train['PassengerId'].isin(split_cv[predictions != cv_df.values[:,0]]['PassengerId'])]
-#print bad_cases
-#测试数据的处理
+print bad_cases
 '''
+#测试数据的处理
+
 
 data_test = pd.read_csv(absPath + '/data/test.csv')
 data_test.loc[(data_test.Fare.isnull()), 'Fare'] = 0
@@ -186,17 +197,25 @@ data_test.loc[(data_test.Age.isnull()), 'Age'] = predictedAges
 
 data_test = set_Cabin_type(data_test)
 dummies_Cabin = pd.get_dummies(data_test['Cabin'], prefix='Cabin')
-dummies_Embarked = pd.get_dummies(data_test['Embarked'], prefix='Embarked')
+#dummies_Embarked = pd.get_dummies(data_test['Embarked'], prefix='Embarked')
 dummies_Sex = pd.get_dummies(data_test['Sex'], prefix='Sex')
 dummies_Pclass = pd.get_dummies(data_test['Pclass'], prefix='Pclass')
 
-df_test = pd.concat([data_test, dummies_Cabin, dummies_Embarked, dummies_Sex, dummies_Pclass], axis=1)
+df_test = pd.concat([data_test, dummies_Cabin, dummies_Sex, dummies_Pclass], axis=1)
+#child
+df_test['Child'] = 0
+df_test.loc[(df_test.Age < 12), 'Child'] = 1
+#mother
+df_test['Mother'] = 0
+df_test.loc[((df_test.Parch > 1) & ('Mrs' in  df_test.Name)), 'Mother'] = 1
+#fam size
+df_test['Family_size'] = df_test['Parch'] + df_test['SibSp'] + 1
+
 df_test.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
 df_test['Age_scaled'] = scaler.fit_transform(np.array(df_test['Age']).reshape(-1, 1), age_scale_param)
 df_test['Fare_scaled'] = scaler.fit_transform(np.array(df_test['Fare']).reshape(-1, 1), fare_scale_param)
 
-test = df_test.filter(regex='Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+test = df_test.filter(regex='Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 predictions = clf.predict(test)
 result = pd.DataFrame({'PassengerId':data_test['PassengerId'].values, 'Survived':predictions.astype(np.int32)})
 result.to_csv(absPath + '/data/logistic_regression_prediction.csv', index=False)
-'''
