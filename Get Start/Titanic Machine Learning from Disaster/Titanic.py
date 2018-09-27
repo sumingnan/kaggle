@@ -94,6 +94,15 @@ plt.legend([u"男性/低级舱"], loc='best')
 plt.show()
 '''
 '''
+plt.title(u"根据舱等级和性别的获救情况")
+
+ax1=fig.add_subplot(141)
+data_train.Survived[data_train.Sex == 'female'][data_train.Parch > 0].value_counts().plot(kind='bar', label="female highclass", color='#FA2479')
+ax1.set_xticklabels([u"获救", u"未获救"], rotation=0)
+ax1.legend([u"母亲"], loc='best')
+plt.show()
+'''
+'''
 Survived_0 = data_train.Embarked[data_train.Survived == 0].value_counts()
 Survived_1 = data_train.Embarked[data_train.Survived == 1].value_counts()
 df=pd.DataFrame({u'获救':Survived_1, u'未获救':Survived_0})
@@ -130,52 +139,51 @@ def CabinNoCheck(no):
     return 0
 
 def set_Cabin_type(df):
-    df.loc[(df.Cabin.notnull()), 'Cabin_No'] = df.loc[df.Cabin.notnull(), "Cabin"]
+    #df.loc[(df.Cabin.notnull()), 'Cabin_Num'] = df.loc[df.Cabin.notnull(), "Cabin"]
     df.loc[(df.Cabin.notnull()), 'Cabin'] = "Yes"
     df.loc[(df.Cabin.isnull()), 'Cabin'] = "No"
     return df
 
 def checkCabinNo(df):
     for i in range(0, len(df)):
-        if df.iloc[i]['Cabin_No'] != 0:
-            v = df.iloc[i]['Cabin_No']
-            df.iloc[i, df.columns.get_loc('Cabin_No')] = float(CabinNoCheck(v))
+        if df.iloc[i]['Cabin_Num'] != 0:
+            v = df.iloc[i]['Cabin_Num']
+            df.iloc[i, df.columns.get_loc('Cabin_Num')] = float(CabinNoCheck(v))
     return df
 
 data_train, rfr = set_missing_ages(data_train)
-data_train['Cabin_No'] = float(0)
+#data_train['Cabin_Num'] = float(0)
 data_train = set_Cabin_type(data_train)
-data_train = checkCabinNo(data_train)
-data_train['Cabin_No'] = data_train['Cabin_No'].astype(float)
+#data_train = checkCabinNo(data_train)
+#data_train['Cabin_Num'] = data_train['Cabin_Num'].astype(float)
 #print data_train['Age']
-print data_train['Cabin_No']
+#print data_train['Cabin_Num']
 
 dummies_Cabin = pd.get_dummies(data_train['Cabin'], prefix='Cabin')
-#dummies_Embarked = pd.get_dummies(data_train['Embarked'], prefix='Embarked')
+dummies_Embarked = pd.get_dummies(data_train['Embarked'], prefix='Embarked')
 dummies_Sex = pd.get_dummies(data_train['Sex'], prefix='Sex')
 dummies_Pclass = pd.get_dummies(data_train['Pclass'], prefix='Pclass')
 
-df = pd.concat([data_train, dummies_Cabin, dummies_Sex, dummies_Pclass], axis=1)
+df = pd.concat([data_train,dummies_Cabin,dummies_Embarked, dummies_Sex, dummies_Pclass], axis=1)
 #child
 df['Child'] = 0
 df.loc[(df.Age < 12), 'Child'] = 1
 #mother
 df['Mother'] = 0
-df.loc[((df.Parch > 1) & ('Mrs' in df.Name)), 'Mother'] = 1
+df.loc[((df.Parch > 1) & (str(df.Name).find('Mrs') > -1)), 'Mother'] = 1
 #fam size
 df['Family_size'] = df['Parch'] + df['SibSp'] + 1
 df.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
 
 scaler = preprocessing.StandardScaler()
 age_scale_param = scaler.fit(np.array(df['Age']).reshape(-1, 1))
-print type(df['Age'])
 df['Age_scaled'] = scaler.fit_transform(np.array(df['Age']).reshape(-1, 1), age_scale_param)
 fare_scale_param = scaler.fit(np.array(df['Fare']).reshape(-1, 1))
 df['Fare_scaled'] = scaler.fit_transform(np.array(df['Fare']).reshape(-1, 1), fare_scale_param)
-cabinNo_scale_param = scaler.fit(np.array(df['Cabin_No']).reshape(-1, 1))
-df['Cabin_No_scaled'] = scaler.fit_transform(np.array(df['Cabin_No']).reshape(-1, 1), cabinNo_scale_param)
-print (df)
-df.drop(['Cabin_No'], axis=1, inplace=True)
+#cabinNum_scale_param = scaler.fit(np.array(df['Cabin_Num']).reshape(-1, 1))
+#df['Cabin_Num_scaled'] = scaler.fit_transform(np.array(df['Cabin_Num']).reshape(-1, 1), cabinNum_scale_param)
+#print (df)
+df.to_csv(absPath + '/data/df.csv', index=False)
 train_df = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 train_np = train_df.values
 #训练
@@ -197,13 +205,16 @@ train_df = split_train.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.
 clf1 = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
 clf1.fit(train_df.values[:,1:], train_df.values[:,0])
 
+clfAA = pd.DataFrame({"columns":list(train_df.columns)[1:], "coef":list(clf.coef_.T)})
+clfAA.to_csv(absPath + '/data/xishu.csv', index=False)
+
 cv_df = split_cv.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Sex_.*|Pclass_.*|Child|Mother|Family_size')
 predictions = clf1.predict(cv_df.values[:,1:])
 
 origin_data_train = pd.read_csv(absPath + '/data/Train.csv')
 bad_cases = origin_data_train.loc[origin_data_train['PassengerId'].isin(split_cv[predictions != cv_df.values[:,0]]['PassengerId'])]
 bad_cases.to_csv(absPath + '/data/badcase.csv', index=False)
-print bad_cases
+#print bad_cases
 
 #测试数据的处理
 
