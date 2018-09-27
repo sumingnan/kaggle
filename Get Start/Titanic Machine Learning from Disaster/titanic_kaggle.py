@@ -231,32 +231,75 @@ train_X, valid_X, train_y, valid_y = train_test_split(train_valid_X, train_valid
 
 plot_variable_importance(train_X, train_y)
 
-#Random Forests Model 随机森林
+if False:
+    # Random Forests Model 随机森林
+    modelRFM = RandomForestClassifier(n_estimators=100)
+    modelRFM.fit(train_X, train_y)
+    print 'Random Forests Model 训练误差:', modelRFM.score(train_X, train_y), '测试误差:', modelRFM.score(valid_X, valid_y)
+
+    #Support Vector Machines 支持向量机
+    modelSVM = SVC()
+    modelSVM.fit(train_X, train_y)
+    print 'Support Vector Machines 训练误差:', modelSVM.score(train_X, train_y), '测试误差:', modelSVM.score(valid_X, valid_y)
+
+    #Gradient Boosting Classifier
+    modelGBC = GradientBoostingClassifier()
+    modelGBC.fit(train_X, train_y)
+    print 'Gradient Boosting Classifier 训练误差:', modelGBC.score(train_X, train_y), '测试误差:', modelGBC.score(valid_X, valid_y)
+
+    #K-nearest neighbors
+    modelKNN = KNeighborsClassifier(n_neighbors=3)
+    modelKNN.fit(train_X, train_y)
+    print 'K-nearest neighbors 训练误差:', modelKNN.score(train_X, train_y), '测试误差:', modelKNN.score(valid_X, valid_y)
+
+    #Gaussian Naive Bayes
+    modelGNB = GaussianNB()
+    modelGNB.fit(train_X, train_y)
+    print 'Gaussian Naive Bayes 训练误差:', modelGNB.score(train_X, train_y), '测试误差:', modelGNB.score(valid_X, valid_y)
+
+    #Logistic Regression
+    modelLR = LogisticRegression()
+    modelLR.fit(train_X, train_y)
+    print 'LR 训练误差:', modelLR.score(train_X, train_y), '测试误差:' , modelLR.score(valid_X, valid_y)
+
+# Random Forests Model 随机森林
 modelRFM = RandomForestClassifier(n_estimators=100)
-modelRFM.fit(train_X, train_y)
-print 'Random Forests Model 训练误差:', modelRFM.score(train_X, train_y), '测试误差:', modelRFM.score(valid_X, valid_y)
+modelRFM.fit(train_valid_X, train_valid_Y)
+print 'Random Forests Model 训练误差:', modelRFM.score(train_valid_X, train_valid_Y)
+testRFM_y = modelRFM.predict(test_X)
 
-#Support Vector Machines 支持向量机
+# Support Vector Machines 支持向量机
 modelSVM = SVC()
-modelSVM.fit(train_X, train_y)
-print 'Support Vector Machines 训练误差:', modelSVM.score(train_X, train_y), '测试误差:', modelSVM.score(valid_X, valid_y)
+modelSVM.fit(train_valid_X, train_valid_Y)
+print 'Support Vector Machines 训练误差:', modelSVM.score(train_valid_X, train_valid_Y)
+testSVM_y = modelSVM.predict(test_X)
 
-#Gradient Boosting Classifier
+# Gradient Boosting Classifier
 modelGBC = GradientBoostingClassifier()
-modelGBC.fit(train_X, train_y)
-print 'Gradient Boosting Classifier 训练误差:', modelGBC.score(train_X, train_y), '测试误差:', modelGBC.score(valid_X, valid_y)
+modelGBC.fit(train_valid_X, train_valid_Y)
+print 'Gradient Boosting Classifier 训练误差:', modelGBC.score(train_valid_X, train_valid_Y)
+testGBC_y = modelGBC.predict(test_X)
 
-#K-nearest neighbors
+# K-nearest neighbors
 modelKNN = KNeighborsClassifier(n_neighbors=3)
-modelKNN.fit(train_X, train_y)
-print 'K-nearest neighbors 训练误差:', modelKNN.score(train_X, train_y), '测试误差:', modelKNN.score(valid_X, valid_y)
+modelKNN.fit(train_valid_X, train_valid_Y)
+print 'K-nearest neighbors 训练误差:', modelKNN.score(train_valid_X, train_valid_Y)
+testKNN_y = modelKNN.predict(test_X)
 
-#Gaussian Naive Bayes
+# Gaussian Naive Bayes
 modelGNB = GaussianNB()
-modelGNB.fit(train_X, train_y)
-print 'Gaussian Naive Bayes 训练误差:', modelGNB.score(train_X, train_y), '测试误差:', modelGNB.score(valid_X, valid_y)
+modelGNB.fit(train_valid_X, train_valid_Y)
+print 'Gaussian Naive Bayes 训练误差:', modelGNB.score(train_valid_X, train_valid_Y)
+testGNB_y = modelGNB.predict(test_X)
 
-#Logistic Regression
+# Logistic Regression
 modelLR = LogisticRegression()
-modelLR.fit(train_X, train_y)
-print 'LR 训练误差:', modelLR.score(train_X, train_y), '测试误差:' , modelLR.score(valid_X, valid_y)
+modelLR.fit(train_valid_X, train_valid_Y)
+print 'LR 训练误差:', modelLR.score(train_valid_X, train_valid_Y)
+testLR_y = modelLR.predict(test_X)
+
+passenger_id = full[891:].PassengerId
+test = pd.DataFrame( { 'PassengerId': passenger_id , 'Survived': test_Y } )
+test.shape
+test.head()
+test.to_csv( 'titanic_pred.csv' , index = False )
