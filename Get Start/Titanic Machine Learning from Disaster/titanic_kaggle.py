@@ -14,6 +14,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC, LinearSVC
 from sklearn.ensemble import RandomForestClassifier , GradientBoostingClassifier
+import sklearn.preprocessing as preprocessing
 
 # Modelling Helpers
 from sklearn.preprocessing import Imputer , Normalizer , scale
@@ -140,9 +141,15 @@ pclass = pd.get_dummies(full.Pclass, prefix='Pclass')
 imputed = pd.DataFrame()
 # Fill missing values of Age with the average of Age (mean)
 imputed['Age'] = full.Age.fillna(full.Age.mean())
+imputed['Child'] = imputed['Age'].map(lambda s : 1 if s < 12 else 0)
+scaler = preprocessing.StandardScaler()
+age_scale_param = scaler.fit(np.array(imputed['Age']).reshape(-1, 1))
+imputed['Age'] = scaler.fit_transform(np.array(imputed['Age']).reshape(-1, 1), age_scale_param)
 # Fill missing values of Fare with the average of Fare (mean)
 imputed['Fare'] = full.Fare.fillna(full.Fare.mean())
-#print imputed.head()
+fare_scale_param = scaler.fit(np.array(imputed['Fare']).reshape(-1, 1))
+imputed['Fare'] = scaler.fit_transform(np.array(imputed['Fare']).reshape(-1, 1), fare_scale_param)
+print imputed.head()
 
 title = pd.DataFrame()
 title['Title'] = full['Name'].map( lambda name:name.split(',')[1].split('.')[0].strip() )
@@ -216,8 +223,8 @@ family['Family_Large'] = family['FamilySize'].map( lambda s :1 if s >= 5 else 0 
 #print family.head()
 
 # Select which features/variables to include in the dataset from the list below:
-# imputed , embarked , pclass , sex , family , cabin , ticket
-full_X = pd.concat([imputed, embarked, cabin, sex], axis=1)
+# imputed (Age, Fare), embarked , pclass , sex , family , cabin , ticket, title
+full_X = pd.concat([imputed, embarked, cabin, sex, pclass, family, title], axis=1)
 #print full_X.head()
 
 # Create all datasets that are necessary to train, validate and test models
@@ -231,7 +238,7 @@ train_X, valid_X, train_y, valid_y = train_test_split(train_valid_X, train_valid
 
 plot_variable_importance(train_X, train_y)
 
-if False:
+if True:
     # Random Forests Model 随机森林
     modelRFM = RandomForestClassifier(n_estimators=100)
     modelRFM.fit(train_X, train_y)
@@ -262,44 +269,52 @@ if False:
     modelLR.fit(train_X, train_y)
     print 'LR 训练误差:', modelLR.score(train_X, train_y), '测试误差:' , modelLR.score(valid_X, valid_y)
 
-# Random Forests Model 随机森林
-modelRFM = RandomForestClassifier(n_estimators=100)
-modelRFM.fit(train_valid_X, train_valid_Y)
-print 'Random Forests Model 训练误差:', modelRFM.score(train_valid_X, train_valid_Y)
-testRFM_y = modelRFM.predict(test_X)
+    test_Y = (testRFM_y + testSVM_y + testKNN_y + testGNB_y + testLR_y)
+    test_Y = np.where(test_Y > 2, 1, 0)
+else:
+    # Random Forests Model 随机森林
+    modelRFM = RandomForestClassifier(n_estimators=100)
+    modelRFM.fit(train_valid_X, train_valid_Y)
+    print 'Random Forests Model 训练误差:', modelRFM.score(train_valid_X, train_valid_Y)
+    testRFM_y = modelRFM.predict(test_X)
 
-# Support Vector Machines 支持向量机
-modelSVM = SVC()
-modelSVM.fit(train_valid_X, train_valid_Y)
-print 'Support Vector Machines 训练误差:', modelSVM.score(train_valid_X, train_valid_Y)
-testSVM_y = modelSVM.predict(test_X)
+    # Support Vector Machines 支持向量机
+    modelSVM = SVC()
+    modelSVM.fit(train_valid_X, train_valid_Y)
+    print 'Support Vector Machines 训练误差:', modelSVM.score(train_valid_X, train_valid_Y)
+    testSVM_y = modelSVM.predict(test_X)
 
-# Gradient Boosting Classifier
-modelGBC = GradientBoostingClassifier()
-modelGBC.fit(train_valid_X, train_valid_Y)
-print 'Gradient Boosting Classifier 训练误差:', modelGBC.score(train_valid_X, train_valid_Y)
-testGBC_y = modelGBC.predict(test_X)
+    # Gradient Boosting Classifier
+    modelGBC = GradientBoostingClassifier()
+    modelGBC.fit(train_valid_X, train_valid_Y)
+    print 'Gradient Boosting Classifier 训练误差:', modelGBC.score(train_valid_X, train_valid_Y)
+    testGBC_y = modelGBC.predict(test_X)
 
-# K-nearest neighbors
-modelKNN = KNeighborsClassifier(n_neighbors=3)
-modelKNN.fit(train_valid_X, train_valid_Y)
-print 'K-nearest neighbors 训练误差:', modelKNN.score(train_valid_X, train_valid_Y)
-testKNN_y = modelKNN.predict(test_X)
+    # K-nearest neighbors
+    modelKNN = KNeighborsClassifier(n_neighbors=3)
+    modelKNN.fit(train_valid_X, train_valid_Y)
+    print 'K-nearest neighbors 训练误差:', modelKNN.score(train_valid_X, train_valid_Y)
+    testKNN_y = modelKNN.predict(test_X)
 
-# Gaussian Naive Bayes
-modelGNB = GaussianNB()
-modelGNB.fit(train_valid_X, train_valid_Y)
-print 'Gaussian Naive Bayes 训练误差:', modelGNB.score(train_valid_X, train_valid_Y)
-testGNB_y = modelGNB.predict(test_X)
+    # Gaussian Naive Bayes
+    modelGNB = GaussianNB()
+    modelGNB.fit(train_valid_X, train_valid_Y)
+    print 'Gaussian Naive Bayes 训练误差:', modelGNB.score(train_valid_X, train_valid_Y)
+    testGNB_y = modelGNB.predict(test_X)
 
-# Logistic Regression
-modelLR = LogisticRegression()
-modelLR.fit(train_valid_X, train_valid_Y)
-print 'LR 训练误差:', modelLR.score(train_valid_X, train_valid_Y)
-testLR_y = modelLR.predict(test_X)
+    # Logistic Regression
+    modelLR = LogisticRegression()
+    modelLR.fit(train_valid_X, train_valid_Y)
+    print 'LR 训练误差:', modelLR.score(train_valid_X, train_valid_Y)
+    testLR_y = modelLR.predict(test_X)
+    testLR_y = testLR_y.astype(np.int32)
+    #print pd.DataFrame({"columns": list(train_valid_X.columns)[:], "coef": list(modelLR.coef_.T)})
 
-passenger_id = full[891:].PassengerId
-test = pd.DataFrame( { 'PassengerId': passenger_id , 'Survived': test_Y } )
-test.shape
-test.head()
-test.to_csv( 'titanic_pred.csv' , index = False )
+    test_Y = (testRFM_y + testSVM_y + testKNN_y + testGNB_y + testLR_y)
+    test_Y = np.where(test_Y > 2, 1, 0)
+
+    passenger_id = full[891:].PassengerId
+    test = pd.DataFrame( { 'PassengerId': passenger_id , 'Survived': testLR_y } )
+    test.shape
+    test.head()
+    test.to_csv( absPath +  '/data/titanic_pred.csv' , index = False )
