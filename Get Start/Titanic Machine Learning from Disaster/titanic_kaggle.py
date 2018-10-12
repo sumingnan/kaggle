@@ -15,6 +15,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC, LinearSVC
 from sklearn.ensemble import RandomForestClassifier , GradientBoostingClassifier
 import sklearn.preprocessing as preprocessing
+from sklearn.ensemble import RandomForestRegressor
 
 # Modelling Helpers
 from sklearn.preprocessing import Imputer , Normalizer , scale
@@ -27,6 +28,7 @@ import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 import seaborn as sns
 import os
+from sklearn.model_selection import KFold
 
 # Configure visualisations
 #%matplotlib inline
@@ -138,19 +140,6 @@ pclass = pd.get_dummies(full.Pclass, prefix='Pclass')
 #print pclass.head()
 
 # Create dataset
-imputed = pd.DataFrame()
-# Fill missing values of Age with the average of Age (mean)
-imputed['Age'] = full.Age.fillna(full.Age.mean())
-imputed['Child'] = imputed['Age'].map(lambda s : 1 if s < 12 else 0)
-scaler = preprocessing.StandardScaler()
-age_scale_param = scaler.fit(np.array(imputed['Age']).reshape(-1, 1))
-imputed['Age'] = scaler.fit_transform(np.array(imputed['Age']).reshape(-1, 1), age_scale_param)
-# Fill missing values of Fare with the average of Fare (mean)
-imputed['Fare'] = full.Fare.fillna(full.Fare.mean())
-fare_scale_param = scaler.fit(np.array(imputed['Fare']).reshape(-1, 1))
-imputed['Fare'] = scaler.fit_transform(np.array(imputed['Fare']).reshape(-1, 1), fare_scale_param)
-print imputed.head()
-
 title = pd.DataFrame()
 title['Title'] = full['Name'].map( lambda name:name.split(',')[1].split('.')[0].strip() )
 # a map of more aggregated titles
@@ -179,6 +168,54 @@ Title_Dictionary = {
 title['Title'] = title.Title.map(Title_Dictionary)
 title = pd.get_dummies(title.Title)
 #print title.head()
+
+imputed = pd.DataFrame()
+scaler = preprocessing.StandardScaler()
+# Fill missing values of Fare with the average of Fare (mean)
+imputed['Fare'] = full.Fare.fillna(full.Fare.mean())
+def setMissAge(imputed, title, full):
+    age_df = pd.DataFrame()
+    age_df['Age'] = full['Age']
+    age_df['Fare'] = imputed['Fare']
+    age_df['Parch'] = full['Parch']
+    age_df['SibSp'] = full['SibSp']
+    age_df['Pclass'] = full['Pclass']
+    age_df['Master'] = title['Master']
+    age_df['Miss'] = title['Miss']
+    age_df['Mr'] = title['Mr']
+    age_df['Mrs'] = title['Mrs']
+    age_df['Officer'] = title['Officer']
+    age_df['Royalty'] = title['Royalty']
+    #age_df['Title'] = title['Title']
+
+    knowAge = age_df[age_df.Age.notnull()].values
+    unknowAge = age_df[age_df.Age.isnull()].values
+
+    y = knowAge[:,0]
+    X = knowAge[:,1:]
+    rfr = RandomForestRegressor(random_state=0, n_estimators=2000, n_jobs=-1)
+    rfr.fit(X, y)
+
+    predictAges = rfr.predict(unknowAge[:,1::])
+    age_df.loc[age_df.Age.isnull(), 'Age'] = predictAges
+    #print age_df['Age']
+    return age_df['Age']
+
+age = setMissAge(imputed, title, full)
+
+fare_scale_param = scaler.fit(np.array(imputed['Fare']).reshape(-1, 1))
+imputed['Fare'] = scaler.fit_transform(np.array(imputed['Fare']).reshape(-1, 1), fare_scale_param)
+# Fill missing values of Age with the average of Age (mean)
+imputed['Age'] = age
+imputed['Child'] = imputed['Age'].map(lambda s : 1 if s < 12 else 0)
+#imputed['Age_Deg'] = imputed['Age'].map(lambda s : 1 if s < 8 else ( 2 if s < 18 else (3 if s < 29 else ( 4 if s < 41 else (5 if s < 66 else 6) ) ) ) )
+imputed['Mother'] = 0
+imputed.loc[((full.Parch > 1) & (str(full.Name).find('Mrs') > -1)), 'Mother'] = 1
+#imputed = imputed.drop(['Age'], axis=1)
+age_scale_param = scaler.fit(np.array(imputed['Age']).reshape(-1, 1))
+imputed['Age'] = scaler.fit_transform(np.array(imputed['Age']).reshape(-1, 1), age_scale_param)
+
+#print imputed.head()
 
 cabin = pd.DataFrame()
 # replacing missing cabins with U (for Uknown)
@@ -221,10 +258,12 @@ family['Family_Small'] = family['FamilySize'].map( lambda s :1 if 2 <= s <= 4 el
 family['Family_Large'] = family['FamilySize'].map( lambda s :1 if s >= 5 else 0 )
 
 #print family.head()
+passengerId = pd.DataFrame()
+passengerId['PassengerId'] = full['PassengerId']
 
 # Select which features/variables to include in the dataset from the list below:
 # imputed (Age, Fare), embarked , pclass , sex , family , cabin , ticket, title
-full_X = pd.concat([imputed, embarked, cabin, sex, pclass, family, title], axis=1)
+full_X = pd.concat([passengerId, imputed, embarked, cabin, sex, pclass, family, title], axis=1)
 #print full_X.head()
 
 # Create all datasets that are necessary to train, validate and test models
@@ -232,8 +271,11 @@ train_valid_X = full_X[0:891]
 train_valid_Y = titanic.Survived
 
 test_X = full_X[891:]
-train_X, valid_X, train_y, valid_y = train_test_split(train_valid_X, train_valid_Y, train_size=0.7)
+#print train_valid_X
+trainFull_X, validFull_X, train_y, valid_y = train_test_split(train_valid_X, train_valid_Y, train_size=0.7)
 
+train_X = trainFull_X.ix[:,1:]
+valid_X = validFull_X.ix[:,1:]
 #print full_X.shape, train_X.shape, valid_X.shape, train_y.shape, valid_y.shape, test_X.shape
 
 plot_variable_importance(train_X, train_y)
@@ -268,9 +310,15 @@ if True:
     modelLR = LogisticRegression()
     modelLR.fit(train_X, train_y)
     print 'LR 训练误差:', modelLR.score(train_X, train_y), '测试误差:' , modelLR.score(valid_X, valid_y)
+   # print pd.DataFrame({"columns": list(train_valid_X.columns)[1:], "coef": list(modelLR.coef_.T)})
 
-    test_Y = (testRFM_y + testSVM_y + testKNN_y + testGNB_y + testLR_y)
-    test_Y = np.where(test_Y > 2, 1, 0)
+    predictions = modelLR.predict(valid_X)
+    bad_cases = titanic.loc[titanic['PassengerId'].isin(validFull_X[ predictions != valid_y]['PassengerId'].values)]
+    bad_cases.to_csv(absPath + '/data/badcase.csv', index=False)
+    print titanic.head()
+
+    #test_Y = (testRFM_y + testSVM_y + testKNN_y + testGNB_y + testLR_y)
+    #test_Y = np.where(test_Y > 2, 1, 0)
 else:
     # Random Forests Model 随机森林
     modelRFM = RandomForestClassifier(n_estimators=100)
@@ -310,8 +358,8 @@ else:
     testLR_y = testLR_y.astype(np.int32)
     #print pd.DataFrame({"columns": list(train_valid_X.columns)[:], "coef": list(modelLR.coef_.T)})
 
-    test_Y = (testRFM_y + testSVM_y + testKNN_y + testGNB_y + testLR_y)
-    test_Y = np.where(test_Y > 2, 1, 0)
+    test_Y = (testSVM_y + testGNB_y + testLR_y)
+    test_Y = np.where(test_Y > 1, 1, 0)
 
     passenger_id = full[891:].PassengerId
     test = pd.DataFrame( { 'PassengerId': passenger_id , 'Survived': testLR_y } )

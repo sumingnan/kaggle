@@ -93,7 +93,7 @@ plt.legend([u"男性/低级舱"], loc='best')
 
 plt.show()
 '''
-'''
+
 plt.title(u"根据舱等级和性别的获救情况")
 
 ax1=fig.add_subplot(141)
@@ -101,7 +101,7 @@ data_train.Survived[data_train.Sex == 'female'][data_train.Parch > 0].value_coun
 ax1.set_xticklabels([u"获救", u"未获救"], rotation=0)
 ax1.legend([u"母亲"], loc='best')
 plt.show()
-'''
+
 '''
 Survived_0 = data_train.Embarked[data_train.Survived == 0].value_counts()
 Survived_1 = data_train.Embarked[data_train.Survived == 1].value_counts()
